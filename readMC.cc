@@ -143,10 +143,6 @@ void readMC::asciiWriter(ofstream& file){
 
 /* Does nothing but maybe useful later */
 void readMC::rootWriterInit(){
-}
-
-/* Writes the rootData to the TTree */
-void readMC::rootWriter(){
     int n=0;
 
     outTree->Branch("ID",&(outVals[n]),"ID/F");
@@ -225,7 +221,10 @@ void readMC::rootWriter(){
         outTree->Branch("12VRadio",&(outVals[n+4]),"12VRadio/F");
         n+=5;
     }
+}
 
+/* Writes the rootData to the TTree */
+void readMC::rootWriter(){
     outTree->Fill();
 }
 
@@ -270,10 +269,10 @@ int readMC::Run(){
             cout << "I/O error: Could not open file '" << rootFileName << "'" << endl;
             return 1;
         }
-        rootWriterInit();
     }
 
     for(auto &fChain : fChains){
+        int count=0;
         fChain->SetBranchAddress("SDMonCalBranch",&fSDMonCal);
         int fNumberOfEntries = (int)fChain->GetEntries();
 
@@ -354,7 +353,11 @@ int readMC::Run(){
             }
           
             if(asciiFile.is_open() && (asciiFileName!=nullptr)) asciiWriter(asciiFile);
-            if(rootFile!=nullptr && (rootFileName!=nullptr)) rootWriter();
+            if(rootFile!=nullptr && (rootFileName!=nullptr)){ 
+                if(count==0)rootWriterInit();
+                rootWriter();
+            }
+            count++;
         }
     }
 
