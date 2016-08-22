@@ -1,0 +1,11 @@
+The ReadAuger-Tool allows to read Auger mc-files containing monitoring and calibration data and raw-data files containing calibration histograms and FADC traces.
+
+<---------- Prerequisits ---------->
+
+- CDAS: Available from the Auger web pages using ape. It is included when installing the "externals"
+
+- boost
+
+<---------- Installation ---------->
+
+type 'make'
