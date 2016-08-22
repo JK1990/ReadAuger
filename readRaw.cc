@@ -145,6 +145,10 @@ void readRaw::asciiWriterHISTO(ofstream& file,TErEvent event,int n){
 }
 
 void readRaw::rootWriterInit(TTree* tree){
+    tree->Branch("ID",&ID,"ID/i");
+    if(TIME){
+        tree->Branch("Time",&utcTime,"ID/i");
+    }
     if(FADC){
         if(find(channels.begin(),channels.end(),0)!=channels.end()){
             tree->Branch("FADCTraceCh0Gain0","TH1S",&trace00);
@@ -167,11 +171,8 @@ void readRaw::rootWriterInit(TTree* tree){
 }
 
 void readRaw::rootWriter(TErEvent ev,TCalibStation station,TTree* tree,int n){
-    tree->Branch("ID",&(station.Id),"ID/i");
-
-    if(TIME){
-        tree->Branch("Time",&(ev.UTCTime),"ID/i");
-    }
+    ID=station.Id;
+    utcTime=ev.UTCTime;
     if(HISTO){
         if(find(channels.begin(),channels.end(),0)!=channels.end())hist0=(TH1F*)station.HCharge(0);
         if(find(channels.begin(),channels.end(),1)!=channels.end())hist1=(TH1F*)station.HCharge(1);

@@ -65,6 +65,9 @@ class readRaw{
         TH1S* trace11=new TH1S("traceCh1Gain1","FADC Trace Ch1 HighGain",NFADCSAMPLES,0,NFADCSAMPLES-1);
         TH1S* trace20=new TH1S("traceCh2Gain0","FADC Trace Ch2 LowGain",NFADCSAMPLES,0,NFADCSAMPLES-1);
         TH1S* trace21=new TH1S("traceCh2Gain1","FADC Trace Ch2 HighGain",NFADCSAMPLES,0,NFADCSAMPLES-1);
+
+        unsigned int ID=0;
+        unsigned int utcTime=0;
 };
 
 string remakeFileName(string fileName,string add);
