@@ -2,7 +2,9 @@ The ReadAuger-Tool allows to read Auger mc-files containing monitoring and calib
 
 <---------- Prerequisits ---------->
 
-- CDAS: Available from the Auger web pages using ape. It is included when installing the "externals"
+- Externals: Available from the Auger web pages using ape.
+
+- CDAS: The version included in the externals does not support the UUB. Since the upgrade to the UUB a new preliminary version of CDAS provided by Xavier is necessary. It can be downloaded from http://labdpr.cab.cnea.gov.ar/auger/cdas-uub.php
 
 - boost
 
