@@ -47,6 +47,10 @@ int readRaw::optionChecker(char* output){
         TIME=true;
         return 1;
     }
+    if(strcmp(output,"-EVID")==0){
+        EVID=true;
+        return 1;
+    }
     if(strstr(output,"-CH=")==output){
         char* channel=output+4;
         if(isInt(channel)){
@@ -102,6 +106,9 @@ void readRaw::asciiWriterInit(ofstream& file,string type){
     if(TIME){
         file << "\tUTCTime";
     }
+    if(EVID){
+        file << "\tEventID";
+    }
     if(type=="FADC"){
         file << "\tGain\tChannel\tFADCTrace\n";
     }
@@ -118,6 +125,9 @@ void readRaw::asciiWriterFADC(ofstream& file,TErEvent event,int n){
             file << event.fSelectedStations[n]->Id;
             if(TIME){
                 file << "\t" << boost::lexical_cast<string>(event.UTCTime);
+            }
+            if(EVID){
+                file << "\t" << boost::lexical_cast<string>(event.Id);
             }
             file << "\t" << gain << "\t" << channel;
             short* trace = event.fSelectedStations[n]->Fadc->Trace[channel][gain];
@@ -147,7 +157,10 @@ void readRaw::asciiWriterHISTO(ofstream& file,TErEvent event,int n){
 void readRaw::rootWriterInit(TTree* tree){
     tree->Branch("ID",&ID,"ID/i");
     if(TIME){
-        tree->Branch("Time",&utcTime,"ID/i");
+        tree->Branch("Time",&utcTime,"Time/i");
+    }
+    if(EVID){
+        tree->Branch("EventID",&evid,"EventID/i");
     }
     if(FADC){
         if(find(channels.begin(),channels.end(),0)!=channels.end()){
@@ -167,12 +180,29 @@ void readRaw::rootWriterInit(TTree* tree){
         if(find(channels.begin(),channels.end(),0)!=channels.end())tree->Branch("CalibrationHistoCh0","TH1F",&hist0);
         if(find(channels.begin(),channels.end(),1)!=channels.end())tree->Branch("CalibrationHistoCh1","TH1F",&hist1);
         if(find(channels.begin(),channels.end(),2)!=channels.end())tree->Branch("CalibrationHistoCh2","TH1F",&hist2);
+        if(find(channels.begin(),channels.end(),3)!=channels.end())tree->Branch("CalibrationHistoSSD","TH1F",&histSSD);
+    }
+}
+
+void readRaw::rootUWriterInit(TTree* tree){
+    if(FADC){
+        tree->Branch("UFADCTraceCh0Gain0","TH1S",&utrace00);
+        tree->Branch("UFADCTraceCh0Gain1","TH1S",&utrace01);
+        tree->Branch("UFADCTraceCh1Gain0","TH1S",&utrace10);
+        tree->Branch("UFADCTraceCh1Gain1","TH1S",&utrace11);
+        tree->Branch("UFADCTraceCh2Gain0","TH1S",&utrace20);
+        tree->Branch("UFADCTraceCh2Gain1","TH1S",&utrace21);
+        tree->Branch("FADCTraceSPMT","TH1S",&traceSPMT);
+        tree->Branch("FADCTraceSSD0","TH1S",&traceSSD0);
+        tree->Branch("FADCTraceSSD1","TH1S",&traceSSD1);
+        tree->Branch("FADCTraceSSD2","TH1S",&traceSSD2);
     }
 }
 
 void readRaw::rootWriter(TErEvent ev,TCalibStation station,TTree* tree,int n){
     ID=station.Id;
     utcTime=ev.UTCTime;
+    evid=ev.Id;
     if(HISTO){
         if(find(channels.begin(),channels.end(),0)!=channels.end())hist0=(TH1F*)station.HCharge(0);
         if(find(channels.begin(),channels.end(),1)!=channels.end())hist1=(TH1F*)station.HCharge(1);
@@ -215,12 +245,41 @@ void readRaw::rootWriter(TErEvent ev,TCalibStation station,TTree* tree,int n){
     tree->Fill();
 }
 
+void readRaw::rootUWriter(TErEvent ev,IoSdEvent event,TTree* tree,int n){
+    ID=event.Stations[n].Id;
+    utcTime=ev.UTCTime;
+    evid=ev.Id;
+    if(HISTO){
+        if(find(channels.begin(),channels.end(),0)!=channels.end())hist0=(TH1F*)event.Stations[n].HCharge(0);
+        if(find(channels.begin(),channels.end(),1)!=channels.end())hist1=(TH1F*)event.Stations[n].HCharge(1);
+        if(find(channels.begin(),channels.end(),2)!=channels.end())hist2=(TH1F*)event.Stations[n].HCharge(2);
+        if(find(channels.begin(),channels.end(),3)!=channels.end())histSSD=(TH1F*)event.Stations[n].HCharge(3);
+    }
+    if(FADC){
+        for(int i=0;i<UNFADCSAMPLES;i++){
+            utrace00->SetBinContent(i+1,event.Stations[n].UFadc->GetValue(0,0,i));
+            utrace01->SetBinContent(i+1,event.Stations[n].UFadc->GetValue(0,1,i));
+            utrace10->SetBinContent(i+1,event.Stations[n].UFadc->GetValue(1,0,i));
+            utrace11->SetBinContent(i+1,event.Stations[n].UFadc->GetValue(1,1,i));
+            utrace20->SetBinContent(i+1,event.Stations[n].UFadc->GetValue(2,0,i));
+            utrace21->SetBinContent(i+1,event.Stations[n].UFadc->GetValue(2,1,i));
+            traceSPMT->SetBinContent(i+1,event.Stations[n].UFadc->GetValue(3,1,i));
+            traceSSD0->SetBinContent(i+1,event.Stations[n].UFadc->GetValue(3,0,i));
+            traceSSD1->SetBinContent(i+1,event.Stations[n].UFadc->GetValue(4,1,i));
+            traceSSD2->SetBinContent(i+1,event.Stations[n].UFadc->GetValue(4,0,i));
+        }
+    }
+
+    tree->Fill();
+}
+
+
 int readRaw::Run(){
     if(outputs.size()==0){
         cout << "Output error: no output variables specified!" << endl;
         return 1;
     }
-    if(channels.size()==0)channels={0,1,2};
+    if(channels.size()==0)channels={0,1,2,3};
 
     ofstream asciiFileFADC;
     ofstream asciiFileHISTO;
@@ -286,6 +345,7 @@ int readRaw::Run(){
         }
         outTree=new TTree("RawData","Raw Data");
         rootWriterInit(outTree);
+        rootUWriterInit(outTree);
     }
 
     EventPos min=input->FirstEvent();
@@ -301,13 +361,29 @@ int readRaw::Run(){
             TCalibStation station=*(ev.fSelectedStations[i]);
 
             if(FADC && asciiFileName!=nullptr){
-                asciiWriterFADC(asciiFileFADC,ev,i);
+                if(!station.IsUUB)asciiWriterFADC(asciiFileFADC,ev,i);
             }
             if(HISTO && asciiFileName!=nullptr){
-                asciiWriterHISTO(asciiFileHISTO,ev,i);
+                if(!station.IsUUB)asciiWriterHISTO(asciiFileHISTO,ev,i);
             }
             if(rootFileName!=nullptr){
-                rootWriter(ev,station,outTree,i);
+                if(!station.IsUUB){
+                    cout << "No UUB" << endl;
+                    rootWriter(ev,station,outTree,i);
+                }
+                //else {
+                //    rootUWriter(ev,station,outTree,i);
+                //    cout << "UUB" << endl;
+                //}
+            }
+        }
+        if(rootFileName!=nullptr){
+            for(unsigned int i=0;i<event.Stations.size();i++){
+                if(find(stationIDs.begin(),stationIDs.end(),event.Stations[i].Id)==stationIDs.end())continue;
+                if(event.Stations[i].IsUUB){
+                    cout << "UUB " << event.Id << endl;
+                    rootUWriter(ev,event,outTree,i);
+                }
             }
         }
         pos++;
@@ -348,6 +424,7 @@ string remakeFileName(string fileName,string add){
 void rawHelp(){
     cout << "RAWDATA Options:\n"
         << "  -TIME\t\tOutput the UTC time\n"
+        << "  -EVID\t\tOutput the event ID\n"
         << "  -FADC\t\tOutput the FADC traces of each event\n"
         << "  -HISTO\tOutput the calibration histograms of each channel\n"
         << "  -CH=[channel]\tSpecifies the output channel. May be used multiple times\n"
