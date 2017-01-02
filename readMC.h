@@ -37,7 +37,7 @@ class readMC{
 
         vector<string> outputs; // Will hold the specified outputs
 
-        vector<string> allOutputs={"-PMTV","-PMTI","-PMTT","-TIME","-ADCBASELINE","-PSU","-ELECBOX","-BATTERY","-SOLAR","-WATER","-VEM","-OTHER"}; //To add new outputs see note at bottom of this file (just to check the given options)
+        vector<string> allOutputs={"-PMTV","-PMTI","-PMTT","-TIME","-ADCBASELINE","-PSU","-ELECBOX","-BATTERY","-SOLAR","-WATER","-VEM","-OTHER","-ENV","-ADC","-VOLTAGES","-CURRENTS"}; //To add new outputs see note at bottom of this file (just to check the given options)
         vector<string> allOutputFileTypes={"-ASCIIOUT","-ROOTOUT"}; //The possible output formats (just to check the given options)
 
         // The specified filenames
