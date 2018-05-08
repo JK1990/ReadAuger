@@ -9,15 +9,18 @@
 using namespace std;
 
 readMC::readMC(int nFiles,char **fileNames){
+    //for(int n=0;n<nFiles;n++){
+    //    TChain* fChain = new TChain("SDMonCal");
+    //    fChain->SetBranchStatus("fRawMonitoring.fListOfMembers",0);
+    //    fChain->SetBranchStatus("fCalibration.fListOfMembers",0);
+    //    fChain->Add(fileNames[n]);
+
+    //    ptrTChain ptrfChain (fChain);
+
+    //    fChains.push_back(ptrfChain);
+    //}
     for(int n=0;n<nFiles;n++){
-        TChain* fChain = new TChain("SDMonCal");
-        fChain->SetBranchStatus("fRawMonitoring.fListOfMembers",0);
-        fChain->SetBranchStatus("fCalibration.fListOfMembers",0);
-        fChain->Add(fileNames[n]);
-
-        ptrTChain ptrfChain (fChain);
-
-        fChains.push_back(ptrfChain);
+        inFileNames.push_back(fileNames[n]);
     }
     fSDMonCal=&SDMonCal;
 };
@@ -42,6 +45,7 @@ void readMC::delStationID(int id){
 /* Checks if the option format for the output is correct
  * Returns 1 if the option is only the output type
  * Returns 2 if the option determines the output file type
+ * Returns 3 if all options shall be output
  */
 int readMC::optionChecker(char* output){
     for(auto &allOut : allOutputs){
@@ -68,6 +72,8 @@ int readMC::optionChecker(char* output){
             }
         }
     }
+
+    if(strcmp(output,"-ALL")==0)return 3;
     return 0;
 }
 
@@ -78,6 +84,12 @@ int readMC::addOption(vector<char*> output){
             continue;
         }
         if(optionChecker(out)==2){
+            continue;
+        }
+        if(optionChecker(out)==3){
+            for(auto &o : allOutputs){
+                outputs.push_back(o);
+            }
             continue;
         }
         cout << "Input error: Invalid option '" << out << "' specified" << endl;
@@ -149,6 +161,9 @@ void readMC::asciiWriterInit(ofstream& file){
     }
     if(find(outputs.begin(),outputs.end(),"-CURRENTS")!=outputs.end()){
         file << "\t12VRadioI\t12VPMI\t3V3AnalogI\t_3V3AnalogI\t5VGPSI\t1V0I\t1V2I\t1V8I\t3V3I\tVInI\t3V3SCI";
+    }
+    if(find(outputs.begin(),outputs.end(),"-EXTRA")!=outputs.end()){
+        file << "\tExtra1\tExtra2\tExtra3\tExtra4\tExtra5\tExtra6\tExtra7\tExtra8";
     }
     file << "\n";
 }
@@ -314,6 +329,17 @@ void readMC::rootWriterInit(){
         outTree->Branch("3V3SCI",&(outVals[n+10]),"3V3SCI/F");
         n+=11;
     }
+    if(find(outputs.begin(),outputs.end(),"-EXTRA")!=outputs.end()){
+        outTree->Branch("Extra0",&(outVals[n]),"Extra0/F");
+        outTree->Branch("Extra1",&(outVals[n+1]),"Extra1/F");
+        outTree->Branch("Extra2",&(outVals[n+2]),"Extra2/F");
+        outTree->Branch("Extra3",&(outVals[n+3]),"Extra3/F");
+        outTree->Branch("Extra4",&(outVals[n+4]),"Extra4/F");
+        outTree->Branch("Extra5",&(outVals[n+5]),"Extra5/F");
+        outTree->Branch("Extra6",&(outVals[n+6]),"Extra6/F");
+        outTree->Branch("Extra7",&(outVals[n+7]),"Extra7/F");
+        n+=8;
+    }
 }
 
 /* Writes the rootData to the TTree */
@@ -364,7 +390,12 @@ int readMC::Run(){
         }
     }
 
-    for(auto &fChain : fChains){
+    //for(auto &fChain : fChains){
+    for(auto &inFileName : inFileNames){  
+        TChain* fChain = new TChain("SDMonCal");
+        fChain->SetBranchStatus("fRawMonitoring.fListOfMembers",0);
+        fChain->SetBranchStatus("fCalibration.fListOfMembers",0);
+        fChain->Add(inFileName);
         int count=0;
         fChain->SetBranchAddress("SDMonCalBranch",&fSDMonCal);
         int fNumberOfEntries = (int)fChain->GetEntries();
@@ -374,9 +405,10 @@ int readMC::Run(){
 
             //Check if monitoring block is filled
             //if(find(stationIDs.begin(),stationIDs.end(),fSDMonCal->fLsId)!=stationIDs.end()){cout << "Found station " << fSDMonCal->fMonitoring.fIsUUB << endl;}
-            //if((fSDMonCal->fMonitoring.fIsMonitoring!=1 || fSDMonCal->fCalibration.fIsCalibration!=1)  && !fSDMonCal->fMonitoring.fIsUUB)continue;
+            if((fSDMonCal->fMonitoring.fIsMonitoring!=1 || fSDMonCal->fCalibration.fIsCalibration!=1)  && !fSDMonCal->fRawMonitoring.fIsUUB)continue;
             //if(find(stationIDs.begin(),stationIDs.end(),fSDMonCal->fLsId)!=stationIDs.end()){cout << "Found station UUB " << fSDMonCal->fLsId << endl;}
             //if(fSDMonCal->fMonitoring.fIsMonitoring!=1 && fSDMonCal->fMonitoring.fIsUUB)continue;
+            //
 
             //Check for the correct station IDs
             int id = fSDMonCal->fLsId;
@@ -385,6 +417,7 @@ int readMC::Run(){
             cout << "Found station " << id << endl;
 
             TSDMonitoring* m=&(fSDMonCal->fMonitoring);
+            TSDRawMonitoring* r=&(fSDMonCal->fRawMonitoring);
             TSDCalibration* c=&(fSDMonCal->fCalibration);
             outVals.clear();
             outVals.push_back((float)id);
@@ -450,32 +483,32 @@ int readMC::Run(){
                 outVals.push_back(m->f12VRadio);
             }
             //Additional output for UUB data
-            if(find(outputs.begin(),outputs.end(),"-PMTV")!=outputs.end() && !fSDMonCal->fMonitoring.fIsUUB){
+            if(find(outputs.begin(),outputs.end(),"-PMTV")!=outputs.end() && fSDMonCal->fRawMonitoring.fIsUUB){
                 outVals.push_back(m->fUPMV[0]);
                 outVals.push_back(m->fUPMV[1]);
                 outVals.push_back(m->fUPMV[2]);
             }
-            if(find(outputs.begin(),outputs.end(),"-PMTI")!=outputs.end() && !fSDMonCal->fMonitoring.fIsUUB){
+            if(find(outputs.begin(),outputs.end(),"-PMTI")!=outputs.end() && fSDMonCal->fRawMonitoring.fIsUUB){
                 outVals.push_back(m->fUPMI[0]);
                 outVals.push_back(m->fUPMI[1]);
                 outVals.push_back(m->fUPMI[2]);
             }
-            if(find(outputs.begin(),outputs.end(),"-PMTT")!=outputs.end() && !fSDMonCal->fMonitoring.fIsUUB){
+            if(find(outputs.begin(),outputs.end(),"-PMTT")!=outputs.end() && fSDMonCal->fRawMonitoring.fIsUUB){
                 outVals.push_back(m->fUPMT[0]);
                 outVals.push_back(m->fUPMT[1]);
                 outVals.push_back(m->fUPMT[2]);
             }
-            if(find(outputs.begin(),outputs.end(),"-ENV")!=outputs.end() && !fSDMonCal->fMonitoring.fIsUUB){
+            if(find(outputs.begin(),outputs.end(),"-ENV")!=outputs.end() && fSDMonCal->fRawMonitoring.fIsUUB){
                 outVals.push_back(m->fExtT);
                 outVals.push_back(m->fAirT);
                 outVals.push_back(m->fAirP);
             }
-            if(find(outputs.begin(),outputs.end(),"-ADC")!=outputs.end() && !fSDMonCal->fMonitoring.fIsUUB){
+            if(find(outputs.begin(),outputs.end(),"-ADC")!=outputs.end() && fSDMonCal->fRawMonitoring.fIsUUB){
                 for(int k=0;k<10;k++){
                     outVals.push_back(m->fADC[k]);
                 }
             }
-            if(find(outputs.begin(),outputs.end(),"-VOLTAGES")!=outputs.end() && !fSDMonCal->fMonitoring.fIsUUB){
+            if(find(outputs.begin(),outputs.end(),"-VOLTAGES")!=outputs.end() && fSDMonCal->fRawMonitoring.fIsUUB){
                 outVals.push_back(m->f12V_WT);
                 outVals.push_back(m->f12VPMT[0]);
                 outVals.push_back(m->f12VPMT[1]);
@@ -492,7 +525,7 @@ int readMC::Run(){
                 outVals.push_back(m->f1V2);
                 outVals.push_back(m->f1V8);
             }
-            if(find(outputs.begin(),outputs.end(),"-CURRENTS")!=outputs.end() && !fSDMonCal->fMonitoring.fIsUUB){
+            if(find(outputs.begin(),outputs.end(),"-CURRENTS")!=outputs.end() && fSDMonCal->fRawMonitoring.fIsUUB){
                 outVals.push_back(m->f12VRadioI);
                 outVals.push_back(m->f12VPMI);
                 outVals.push_back(m->f3V3AnalogI);
@@ -505,6 +538,11 @@ int readMC::Run(){
                 outVals.push_back(m->fVInI);
                 outVals.push_back(m->f3V3SCI);
             }
+            if(find(outputs.begin(),outputs.end(),"-EXTRA")!=outputs.end() && fSDMonCal->fRawMonitoring.fIsUUB){
+                for(int k=0;k<8;k++){
+                    outVals.push_back(r->fExtra[k]);
+                }
+            }
 
             if(asciiFile.is_open() && (asciiFileName!=nullptr)) asciiWriter(asciiFile);
             if(rootFile!=nullptr && (rootFileName!=nullptr)){ 
@@ -513,6 +551,7 @@ int readMC::Run(){
             }
             count++;
         }
+        delete fChain;
     }
 
     if(asciiFile.is_open()) asciiFile.close();
